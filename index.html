@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin & Rider Portal</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"/>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+        }
+        .half {
+            height: 50vh;
+        }
+        .map-img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: transform 0.3s ease;
+            cursor: zoom-in;
+        }
+        .map-img.zoomed {
+            transform: scale(2);
+            cursor: zoom-out;
+        }
+        .page { display: none; }
+        .active { display: block; }
+        .overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(255,255,255,0.95);
+            backdrop-filter: blur(4px);
+            z-index: 50;
+        }
+        #loginModal {
+            z-index: 1000;
+        }
+        #sidebar {
+            z-index: 999;
+        }
+    </style>
+</head>
+<body class="bg-white text-gray-900 font-sans">
+    <!-- Combined User/Admin Login Modal -->
+    <div id="loginModal" class="fixed inset-0 flex items-center justify-center bg-gray-900 bg-opacity-50">
+        <div class="bg-white p-8 rounded-lg shadow-lg w-96">
+            <h2 class="text-2xl font-bold mb-6 text-center">Login</h2>
+            <div class="mb-4">
+                <label class="block text-gray-700 mb-2">Select Role</label>
+                <select id="loginRole" class="w-full px-3 py-2 border rounded">
+                    <option value="admin">Admin</option>
+                    <option value="rider">Rider</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700 mb-2">Username</label>
+                <input type="text" id="loginUsername" class="w-full px-3 py-2 border rounded">
+            </div>
+            <div class="mb-6">
+                <label class="block text-gray-700 mb-2">Password</label>
+                <input type="password" id="loginPassword" class="w-full px-3 py-2 border rounded">
+            </div>
+            <button onclick="handleLogin()" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Login</button>
+        </div>
+    </div>
+
+    <!-- Admin Panel (hidden by default) -->
+    <div id="adminPanel" class="hidden container mx-auto p-4">
+        <div class="flex justify-between items-center mb-6">
+            <h1 class="text-3xl font-bold">Admin Dashboard</h1>
+            <button onclick="logout()" class="bg-red-500 text-white px-4 py-2 rounded">Logout</button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="text-xl font-semibold mb-4">Manage Riders</h3>
+                <div class="space-y-4">
+                    <button onclick="showSection('addRiderSection')" class="w-full bg-blue-500 text-white py-2 rounded">Add New Rider</button>
+                    <button onclick="showSection('viewRidersSection')" class="w-full bg-green-500 text-white py-2 rounded">View All Riders</button>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="text-xl font-semibold mb-4">Rider Status</h3>
+                <div id="statusStats" class="text-center">
+                    <p class="text-lg">Loading statistics...</p>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-lg shadow">
+                <h3 class="text-xl font-semibold mb-4">Quick Actions</h3>
+                <div class="space-y-4">
+                    <button onclick="showSection('searchRiderSection')" class="w-full bg-purple-500 text-white py-2 rounded">Search Rider</button>
+                    <button onclick="showSection('reportsSection')" class="w-full bg-yellow-500 text-white py-2 rounded">Generate Reports</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Add Rider Section -->
+        <div id="addRiderSection" class="hidden bg-white p-6 rounded-lg shadow mb-6">
+            <h3 class="text-xl font-semibold mb-4">Add New Rider</h3>
+            <form id="addRiderForm" class="space-y-4">
+                <div>
+                    <label class="block text-gray-700 mb-2">Username</label>
+                    <input type="text" id="riderUsername" class="w-full px-3 py-2 border rounded" required>
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-2">Password</label>
+                    <input type="password" id="riderPassword" class="w-full px-3 py-2 border rounded" required>
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-2">Full Name</label>
+                    <input type="text" id="riderName" class="w-full px-3 py-2 border rounded" required>
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-2">Email</label>
+                    <input type="email" id="riderEmail" class="w-full px-3 py-2 border rounded" required>
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-2">Phone</label>
+                    <input type="tel" id="riderPhone" class="w-full px-3 py-2 border rounded" required>
+                </div>
+                <div>
+                    <label class="block text-gray-700 mb-2">Status</label>
+                    <select id="riderStatus" class="w-full px-3 py-2 border rounded">
+                        <option value="active">Active</option>
+                        <option value="inactive">Inactive</option>
+                    </select>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Add Rider</button>
+            </form>
+        </div>
+        
+        <!-- View Riders Section -->
+        <div id="viewRidersSection" class="hidden bg-white p-6 rounded-lg shadow mb-6">
+            <h3 class="text-xl font-semibold mb-4">All Riders</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full bg-white">
+                    <thead>
+                        <tr>
+                            <th class="py-2 px-4 border">Username</th>
+                            <th class="py-2 px-4 border">Full Name</th>
+                            <th class="py-2 px-4 border">Email</th>
+                            <th class="py-2 px-4 border">Phone</th>
+                            <th class="py-2 px-4 border">Status</th>
+                            <th class="py-2 px-4 border">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ridersTableBody">
+                        <!-- Riders will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <!-- Search Rider Section -->
+        <div id="searchRiderSection" class="hidden bg-white p-6 rounded-lg shadow mb-6">
+            <h3 class="text-xl font-semibold mb-4">Search Rider</h3>
+            <div class="flex mb-4">
+                <input type="text" id="searchRiderInput" placeholder="Search by username or name" class="flex-grow px-3 py-2 border rounded-l">
+                <button onclick="searchRider()" class="bg-blue-500 text-white px-4 py-2 rounded-r">Search</button>
+            </div>
+            <div id="searchResults" class="space-y-4">
+                <!-- Search results will appear here -->
+            </div>
+        </div>
+        
+        <!-- Reports Section -->
+        <div id="reportsSection" class="hidden bg-white p-6 rounded-lg shadow mb-6">
+            <h3 class="text-xl font-semibold mb-4">Generate Reports</h3>
+            <div class="space-y-4">
+                <button onclick="generateReport('activeRiders')" class="w-full bg-green-500 text-white py-2 rounded">Active Riders Report</button>
+                <button onclick="generateReport('inactiveRiders')" class="w-full bg-red-500 text-white py-2 rounded">Inactive Riders Report</button>
+                <button onclick="generateReport('allRiders')" class="w-full bg-blue-500 text-white py-2 rounded">All Riders Report</button>
+            </div>
+            <div id="reportOutput" class="mt-4 p-4 bg-gray-50 rounded hidden">
+                <!-- Report output will appear here -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Rider Panel (hidden by default) -->
+    <div id="riderPanel" class="hidden">
+        <!-- Hamburger Button -->
+        <button onclick="toggleSidebar()" class="fixed top-4 left-4 z-50 bg-white rounded-full shadow p-2 text-pink-600">
+            <i class="fas fa-bars text-2xl"></i>
+        </button>
+
+        <!-- Sidebar -->
+        <div id="sidebar" class="fixed top-0 left-0 w-72 h-full bg-white border-r border-gray-200 transform -translate-x-full transition-transform duration-300 z-50 overflow-y-auto">
+            <div class="flex items-center justify-between px-6 py-5 border-b">
+                <h1 class="text-2xl font-extrabold flex items-center gap-2">
+                    <span id="sidebarRiderName">Nadeem Ali</span> <i class="fas fa-medal text-black text-2xl"></i>
+                    <span class="text-xl font-extrabold">5</span>
+                </h1>
+                <button onclick="toggleSidebar()" class="text-pink-600">
+                    <i class="fas fa-times text-2xl"></i>
+                </button>
+            </div>
+            <nav class="divide-y divide-gray-200">
+                <ul class="px-6 py-3 space-y-3">
+                    <li><a href="#" class="flex items-center gap-4 text-lg font-semibold"><i class="fas fa-user text-xl"></i> My profile</a></li>
+                </ul>
+                <ul class="px-6 py-3 space-y-3">
+                    <li><a href="#" class="flex items-center gap-4 text-lg font-semibold"><i class="fas fa-calendar-alt text-xl"></i> Available sessions</a></li>
+                    <li><a href="#" class="flex items-center gap-4 text-lg font-semibold"><i class="fas fa-calendar-check text-xl"></i> My sessions</a></li>
+                </ul>
+                <ul class="px-6 py-3 space-y-3">
+                    <li><a href="#" class="flex items-center gap-4 text-lg font-semibold"><i class="far fa-envelope text-xl"></i> Inbox</a></li>
+                </ul>
+                <ul class="px-6 py-3 space-y-3">
+                    <li><a href="#" class="flex items-center gap-4 text-lg font-semibold"><i class="fas fa-history text-xl"></i> Order history</a></li>
+                    <li><a href="#" class="flex items-center gap-4 text-lg font-semibold"><i class="fas fa-wallet text-xl"></i> Wallet</a></li>
+                    <li><a href="#" class="flex items-center gap-4 text-lg font-semibold"><i class="fas fa-money-bill-wave text-xl"></i> Payments</a></li>
+                    <li><a href="#" class="flex items-center gap-4 text-lg font-semibold"><i class="fas fa-id-card text-xl"></i> Opportunities</a></li>
+                </ul>
+                <ul class="px-6 py-3 space-y-3">
+                    <li><a href="#" class="flex items-center gap-4 text-lg font-semibold"><i class="fas fa-coins text-xl"></i> Rewards</a></li>
+                </ul>
+                <ul class="px-6 py-3 space-y-3">
+                    <li><a href="#" class="flex items-center gap-4 text-lg font-semibold"><i class="fas fa-user-plus text-xl"></i> Privacy policy</a></li>
+                </ul>
+                <ul class="px-6 py-3 space-y-3 border-t">
+                    <li class="flex items-center gap-2">
+                        <a href="#" onclick="triggerMapUpload()" class="flex items-center gap-2 text-lg font-semibold text-pink-600">
+                            <i class="fas fa-cog text-xl"></i> Settings
+                        </a>
+                        <button onclick="hideMapUpload()" class="text-xs px-2 py-1 border border-pink-300 rounded text-pink-600 hover:bg-pink-50">
+                            Close
+                        </button>
+                    </li>
+                    <li>
+                        <button onclick="logout()" class="flex items-center gap-2 text-lg font-semibold text-red-600 w-full text-left">
+                            <i class="fas fa-sign-out-alt text-xl"></i> Logout
+                        </button>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+
+        <!-- Map Display (no upload here, zoom only) -->
+        <div class="half bg-gray-200 relative">
+            <img id="mapPreview" src="https://via.placeholder.com/600x300" alt="Map" class="map-img"/>
+        </div>
+
+        <!-- Page 1 -->
+        <div id="page1" class="page active p-4 overflow-y-auto">
+            <h1 class="text-lg font-bold">Food Inn – SMCHS</h1>
+            <p class="text-sm font-medium">Pickup ● Arrive in 1 min</p>
+            <p class="text-sm text-gray-500 mb-3">1 order for pickup</p>
+
+            <div class="border-2 border-pink-200 rounded-md p-3 flex justify-between items-center mb-3">
+                <span class="text-xl font-extrabold">#7871</span>
+            </div>
+
+            <div class="text-sm font-semibold mb-2">s5nn-2527-vso4-#7871 - Aaltan Rehan</div>
+
+            <div class="border-b pb-1 mb-2 flex justify-between items-center text-sm font-semibold">
+                <span>1 item</span>
+                <i class="fas fa-chevron-down text-pink-600"></i>
+            </div>
+
+            <div class="text-sm mb-3">
+                <div class="flex justify-between">
+                    <span>2 Crispy Beijing Beef - Half</span>
+                    <span>1,940 PKR</span>
+                </div>
+            </div>
+
+            <div class="text-center border rounded-lg p-4 mt-4">
+                <p class="text-sm mb-3">How is the pick up experience?</p>
+                <div class="flex justify-center gap-10 text-xl text-gray-500">
+                    <i class="far fa-frown"></i>
+                    <i class="far fa-smile"></i>
+                </div>
+            </div>
+
+            <button onclick="showPage2()" class="w-full mt-4 bg-pink-600 text-white font-bold py-3 rounded-full">
+                Confirm pickup
+            </button>
+        </div>
+
+        <!-- Page 2 (Modal Confirm) -->
+        <div id="page2" class="overlay hidden flex items-center justify-center p-4 text-center">
+            <div class="bg-white p-6 rounded shadow-lg w-full max-w-sm z-30">
+                <h2 class="text-lg font-bold mb-4">Confirm pickup?</h2>
+                <p class="text-sm mb-4">Order #7871 - Confirm pickup?</p>
+                <button onclick="goToPage3()" class="bg-pink-600 text-white w-full py-2 rounded mb-2">Confirm</button>
+                <button onclick="closePage2()" class="text-pink-600 text-sm">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Page 3 -->
+        <div id="page3" class="page p-4 overflow-y-auto">
+            <div class="max-w-md mx-auto border border-gray-300 rounded-md mb-6">
+                <div class="flex items-center justify-between px-4 pt-4">
+                    <div>
+                        <h1 class="font-extrabold text-base">Aaltan Rehan</h1>
+                        <p class="text-xs text-gray-700">Go to customer ● Arrive in 3 min</p>
+                        <p class="text-xs text-gray-700">#7871 ● s5nn-2527-vso4-#7871</p>
+                    </div>
+                    <button class="w-10 h-10 rounded-full border border-pink-400 flex items-center justify-center text-pink-500">
+                        <i class="fas fa-phone-alt fa-lg"></i>
+                    </button>
+                </div>
+
+                <div class="px-4 mt-3 pb-3 border-b text-xs text-gray-700">
+                    <div class="flex space-x-2">
+                        <i class="fas fa-map-marker-alt mt-1 text-gray-500"></i>
+                        <div>
+                            <p>5th Back Alley J 12 block 2 PECHS, near Norani Kabab</p>
+                            <p>Karachi</p>
+                            <p>Floor: First floor</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="px-4 pt-4 pb-2 border-b">
+                    <h2 class="font-extrabold text-base mb-1">s5nn-2527-vso4-#7871</h2>
+                    <p class="font-semibold text-sm mb-3">Food Inn - SMCHS</p>
+                    <p class="text-sm font-semibold mb-3">1 item</p>
+                    <div class="text-xs mb-1 flex justify-between">
+                        <span class="font-semibold">2</span>
+                        <span class="max-w-[60%]">Crispy Beijing Beef - Half</span>
+                        <span>1,940 PKR</span>
+                    </div>
+                    <p class="text-xs text-gray-700 mt-2">Payment</p>
+                    <p class="font-semibold text-sm">Collect cash <span class="font-extrabold ml-2">1,940 PKR</span></p>
+                </div>
+
+                <div class="px-4 pt-4 pb-6 border-b">
+                    <p class="font-extrabold text-xl mt-2 mb-1">PKR 1,940</p>
+                    <p class="text-sm text-gray-700 mb-2">Collect cash from customer</p>
+                    <button class="text-pink-600 font-semibold text-sm">I don't have change</button>
+                </div>
+
+                <div class="px-4 pt-4 pb-6 border-b">
+                    <p class="font-semibold text-sm mb-2">Proof of drop-Off</p>
+                    <p class="text-xs text-gray-700 mb-2">You're far from the customer. Upload photo proof.</p>
+                    <input type="file" accept="image/*" capture="environment" onchange="showImage(event)" class="mb-2 w-full text-sm"/>
+                    <img id="photoPreview" class="rounded w-full h-40 object-cover hidden"/>
+                </div>
+
+                <button type="button" disabled class="w-full bg-gray-300 text-gray-600 font-semibold py-3 rounded-b-md cursor-not-allowed">
+                    Confirm drop-off
+                </button>
+            </div>
+        </div>
+
+        <!-- Hidden Upload Input -->
+        <input type="file" accept="image/*" id="mapInput" class="hidden"/>
+    </div>
+
+    <script>
+        const adminCredentials = {
+            username: "admin",
+            password: "admin123"
+        };
+
+        let users = JSON.parse(localStorage.getItem('riderUsers')) || [];
+        let currentUser = null;
+
+        function handleLogin() {
+            const role = document.getElementById("loginRole").value;
+            const username = document.getElementById("loginUsername").value;
+            const password = document.getElementById("loginPassword").value;
+
+            if (role === "admin") {
+                if (username === adminCredentials.username && password === adminCredentials.password) {
+                    document.getElementById("loginModal").classList.add("hidden");
+                    document.getElementById("adminPanel").classList.remove("hidden");
+                    initAdminPanel();
+                } else {
+                    alert("Invalid admin credentials");
+                }
+            } else if (role === "rider") {
+                const user = users.find(u => u.username === username && u.password === password && u.status === 'active');
+                if (user) {
+                    currentUser = user;
+                    localStorage.setItem("currentRider", JSON.stringify(user));
+                    document.getElementById("loginModal").classList.add("hidden");
+                    initRiderPanel();
+                } else {
+                    alert("Invalid rider credentials or account inactive");
+                }
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            localStorage.removeItem("currentRider");
+            document.getElementById("adminPanel").classList.add("hidden");
+            document.getElementById("riderPanel").classList.add("hidden");
+            document.getElementById("loginModal").classList.remove("hidden");
+        }
+
+        function initAdminPanel() {
+            updateRidersTable();
+            updateStatusStats();
+        }
+
+        function initRiderPanel() {
+            document.getElementById("riderPanel").classList.remove("hidden");
+            
+            // Set rider info in sidebar
+            document.getElementById("sidebarRiderName").textContent = currentUser.name;
+            
+            // Reset to page 1
+            document.getElementById('page1').classList.add('active');
+            document.getElementById('page3').classList.remove('active');
+        }
+
+        function showSection(sectionId) {
+            // Hide all sections first
+            document.querySelectorAll('#adminPanel > div[id$="Section"]').forEach(section => {
+                section.classList.add('hidden');
+            });
+            
+            // Show the requested section
+            document.getElementById(sectionId).classList.remove('hidden');
+        }
+
+        function updateRidersTable() {
+            const tableBody = document.getElementById("ridersTableBody");
+            tableBody.innerHTML = '';
+            
+            users.forEach(user => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="py-2 px-4 border">${user.username}</td>
+                    <td class="py-2 px-4 border">${user.name}</td>
+                    <td class="py-2 px-4 border">${user.email}</td>
+                    <td class="py-2 px-4 border">${user.phone}</td>
+                    <td class="py-2 px-4 border">
+                        <span class="px-2 py-1 text-xs rounded-full ${user.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${user.status.charAt(0).toUpperCase() + user.status.slice(1)}
+                        </span>
+                    </td>
+                    <td class="py-2 px-4 border">
+                        <button onclick="editRider('${user.username}')" class="bg-blue-500 text-white px-2 py-1 rounded text-sm">Edit</button>
+                        <button onclick="deleteRider('${user.username}')" class="bg-red-500 text-white px-2 py-1 rounded text-sm ml-2">Delete</button>
+                    </td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        function updateStatusStats() {
+            const activeCount = users.filter(u => u.status === 'active').length;
+            const inactiveCount = users.length - activeCount;
+            
+            document.getElementById("statusStats").innerHTML = `
+                <div class="mb-2">
+                    <p class="text-sm text-gray-600">Active Riders</p>
+                    <p class="text-2xl font-bold text-green-600">${activeCount}</p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">Inactive Riders</p>
+                    <p class="text-2xl font-bold text-red-600">${inactiveCount}</p>
+                </div>
+            `;
+        }
+
+        // Add Rider Form Submission
+        document.getElementById("addRiderForm").addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const newRider = {
+                username: document.getElementById("riderUsername").value,
+                password: document.getElementById("riderPassword").value,
+                name: document.getElementById("riderName").value,
+                email: document.getElementById("riderEmail").value,
+                phone: document.getElementById("riderPhone").value,
+                status: document.getElementById("riderStatus").value,
+                deliveries: []
+            };
+            
+            users.push(newRider);
+            localStorage.setItem('riderUsers', JSON.stringify(users));
+            
+            // Reset form
+            this.reset();
+            
+            // Update UI
+            updateRidersTable();
+            updateStatusStats();
+            
+            alert('Rider added successfully!');
+        });
+
+        function editRider(username) {
+            const rider = users.find(u => u.username === username);
+            if (!rider) return;
+            
+            // In a real app, you would show a modal or form to edit the rider
+            const newStatus = rider.status === 'active' ? 'inactive' : 'active';
+            rider.status = newStatus;
+            
+            localStorage.setItem('riderUsers', JSON.stringify(users));
+            updateRidersTable();
+            updateStatusStats();
+            
+            alert(`Rider ${username} status changed to ${newStatus}`);
+        }
+
+        function deleteRider(username) {
+            if (confirm(`Are you sure you want to delete rider ${username}?`)) {
+                users = users.filter(u => u.username !== username);
+                localStorage.setItem('riderUsers', JSON.stringify(users));
+                updateRidersTable();
+                updateStatusStats();
+                alert(`Rider ${username} deleted successfully`);
+            }
+        }
+
+        function searchRider() {
+            const searchTerm = document.getElementById("searchRiderInput").value.toLowerCase();
+            const results = users.filter(u => 
+                u.username.toLowerCase().includes(searchTerm) || 
+                u.name.toLowerCase().includes(searchTerm)
+            );
+            
+            const resultsContainer = document.getElementById("searchResults");
+            resultsContainer.innerHTML = '';
+            
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<p class="text-gray-500">No riders found</p>';
+                return;
+            }
+            
+            results.forEach(rider => {
+                const riderCard = document.createElement('div');
+                riderCard.className = 'bg-white p-4 rounded-lg shadow';
+                riderCard.innerHTML = `
+                    <h4 class="font-semibold">${rider.name} <span class="text-sm text-gray-600">(@${rider.username})</span></h4>
+                    <p class="text-sm text-gray-600">${rider.email} | ${rider.phone}</p>
+                    <div class="flex justify-between items-center mt-2">
+                        <span class="px-2 py-1 text-xs rounded-full ${rider.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                            ${rider.status.charAt(0).toUpperCase() + rider.status.slice(1)}
+                        </span>
+                        <div>
+                            <button onclick="editRider('${rider.username}')" class="bg-blue-500 text-white px-2 py-1 rounded text-sm">Edit</button>
+                            <button onclick="deleteRider('${rider.username}')" class="bg-red-500 text-white px-2 py-1 rounded text-sm ml-2">Delete</button>
+                        </div>
+                    </div>
+                `;
+                resultsContainer.appendChild(riderCard);
+            });
+        }
+
+        function generateReport(type) {
+            let reportData = [];
+            let title = '';
+            
+            switch(type) {
+                case 'activeRiders':
+                    reportData = users.filter(u => u.status === 'active');
+                    title = 'Active Riders Report';
+                    break;
+                case 'inactiveRiders':
+                    reportData = users.filter(u => u.status === 'inactive');
+                    title = 'Inactive Riders Report';
+                    break;
+                case 'allRiders':
+                    reportData = users;
+                    title = 'All Riders Report';
+                    break;
+            }
+            
+            const reportOutput = document.getElementById("reportOutput");
+            reportOutput.classList.remove('hidden');
+            
+            if (reportData.length === 0) {
+                reportOutput.innerHTML = `<p>No data available for ${title}</p>`;
+                return;
+            }
+            
+            let reportHTML = `<h4 class="font-bold mb-2">${title} (${reportData.length})</h4>`;
+            
+            reportData.forEach(rider => {
+                reportHTML += `
+                    <div class="mb-4 p-2 border-b">
+                        <p><strong>Name:</strong> ${rider.name}</p>
+                        <p><strong>Username:</strong> ${rider.username}</p>
+                        <p><strong>Email:</strong> ${rider.email}</p>
+                        <p><strong>Phone:</strong> ${rider.phone}</p>
+                        <p><strong>Status:</strong> <span class="${rider.status === 'active' ? 'text-green-600' : 'text-red-600'}">${rider.status}</span></p>
+                    </div>
+                `;
+            });
+            
+            reportOutput.innerHTML = reportHTML;
+        }
+
+        // Rider Page Functions
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('-translate-x-full');
+        }
+
+        function triggerMapUpload() {
+            document.getElementById('mapInput').click();
+        }
+
+        document.getElementById('mapInput').addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            const preview = document.getElementById('mapPreview');
+            if (file) {
+                preview.src = URL.createObjectURL(file);
+            }
+        });
+
+        document.getElementById('mapPreview').addEventListener('click', function () {
+            this.classList.toggle('zoomed');
+        });
+
+        function hideMapUpload() {
+            document.getElementById('mapInput').value = "";
+        }
+
+        function showPage2() {
+            document.getElementById('page2').classList.remove('hidden');
+        }
+
+        function closePage2() {
+            document.getElementById('page2').classList.add('hidden');
+        }
+
+        function goToPage3() {
+            document.getElementById('page1').classList.remove('active');
+            document.getElementById('page2').classList.add('hidden');
+            document.getElementById('page3').classList.add('active');
+        }
+
+        function showImage(event) {
+            const file = event.target.files[0];
+            const preview = document.getElementById('photoPreview');
+            if (file) {
+                preview.src = URL.createObjectURL(file);
+                preview.classList.remove('hidden');
+            }
+        }
+
+        // Auto-show login if not logged in
+        window.onload = () => {
+            const storedRider = localStorage.getItem("currentRider");
+            if (storedRider) {
+                currentUser = JSON.parse(storedRider);
+                initRiderPanel();
+            } else {
+                document.getElementById("loginModal").classList.remove("hidden");
+            }
+        };
+    </script>
+</body>
+</html>
